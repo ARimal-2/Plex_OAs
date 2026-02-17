@@ -1,12 +1,11 @@
+from pyspark.sql import functions as F
+from config import get_config
 
 def run(spark):
     """
     Executes the Dimension table transformations based on User's explicit SQL queries.
     """
-    from pyspark.sql import functions as F
 
-    # Import Config
-    from config import get_config
     CATALOG_NAME = get_config("catalog_name", required=True)
     DB_NAME = get_config("db_name", required=True)
     
@@ -18,9 +17,6 @@ def run(spark):
     print(f"DEBUG: dimension.py using TARGET_NAMESPACE: {TARGET_NAMESPACE}")
 
     # 1. dim_customer
-    # User Query:
-    # SELECT Customer_Address_No AS customer_key, Customer_Address_Code AS ship_to
-    # FROM Common_V_Customer_Address limit 10
     dim_customer = spark.sql("""
         SELECT DISTINCT
             Customer_Address_No AS customer_key,
@@ -31,10 +27,6 @@ def run(spark):
 
 
     # 2. dim_shipper
-    # User Query:
-    # SELECT s.shipper_key, s.freight_amount,l.release_key
-    # from sales_v_shipper s left join sales_v_shipper_line l
-    # ON TRY_CAST(s.Shipper_Key AS INTEGER) = TRY_CAST(l.Shipper_Key AS INTEGER)
     dim_shipper = spark.sql("""
         SELECT
             s.shipper_key,
@@ -47,11 +39,7 @@ def run(spark):
     dim_shipper.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_shipper1")
 
 
-    # 3. dim_po (User referred to as 'dim plex use' but content is PO)
-    # User Query:
-    # select sls.po_key,sls.order_no,sls.po_date,sls.po_no,note,svps.PO_Status from sales_v_po sls
-    # LEFT JOIN Sales_V_PO_Status svps
-    # ON TRY_CAST(sls.PO_Status_Key AS INTEGER)  = svps.PO_Status_Key
+    # 3. dim_po
     dim_po = spark.sql("""
         SELECT
             sls.po_key,
@@ -68,8 +56,6 @@ def run(spark):
 
 
     # 4. dim_part
-    # User Query:
-    # select part_key,part_no,name,revision, Part_No || '-' || Revision AS Item_No from part_v_part
     dim_part = spark.sql("""
         SELECT 
             part_key,

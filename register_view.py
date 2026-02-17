@@ -3,15 +3,10 @@ import sys
 from pyspark.sql import SparkSession
 from config import get_config
 
-# -------------------------------------------------------------------------
-# Configuration
-# -------------------------------------------------------------------------
+
 CATALOG_NAME = get_config("catalog_name", required=True)
 DB_NAME = get_config("db_name", required=True)
 
-# -------------------------------------------------------------------------
-# Logging Setup
-# -------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 

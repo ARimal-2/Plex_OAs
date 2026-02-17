@@ -28,7 +28,7 @@ def prepare_package():
     print(f"Creating dependency package: {zip_name}...")
     with zipfile.ZipFile(zip_name, "w") as z:
         # Add core modules
-        files_to_pack = ["dimension.py", "fact.py", "extract_sql_to_ibm.py", "config.py"]
+        files_to_pack = ["dimension.py", "fact.py", "register_view.py", "config.py"]
         
         for f in files_to_pack:
             file_path = os.path.join(BASE_DIR, f)

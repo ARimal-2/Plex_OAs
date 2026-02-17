@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 import dimension
 import fact
-import extract_sql_to_ibm
+import register_view
 import traceback
 
 if __name__ == "__main__":
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     # 0. Run Extraction & View Creation
     try:
         print("Starting SQL Server Extraction & View Registration...")
-        extract_sql_to_ibm.run(spark)
+        register_view.run(spark)
         print("SQL Server Extraction finished successfully.")
     except Exception as e:
         print(f"Extraction failed: {e}")
