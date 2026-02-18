@@ -30,7 +30,9 @@ def run(spark):
         "part_v_part": "Part_V_Part",
         "sales_v_po_status": "Sales_V_PO_Status",
         "plexus_control_v_plexus_user": "Plexus_control_v_plexus_user",
-        "plexperiod": "PlexPeriod"
+        "plexperiod": "PlexPeriod",
+        "sales_v_price": "Sales_V_Price",
+        "plex_po_type": "plex_po_type"
     }
 
     # 2. DEFINITION: Source Namespace

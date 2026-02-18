@@ -23,7 +23,7 @@ def run(spark):
             Customer_Address_Code AS ship_to
         FROM Common_V_Customer_Address
     """)
-    dim_customer.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_customer11")
+    dim_customer.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_customer1")
 
 
     # 2. dim_shipper
@@ -44,15 +44,19 @@ def run(spark):
         SELECT
             sls.po_key,
             sls.order_no,
-            sls.po_date,
+            sls.po_date AS Order_Date,
             sls.po_no AS customer_po,
             sls.note,
-            svps.PO_Status
+            svps.PO_Status,
+            CONCAT(ppu.first_name, ' ', ppu.last_name) AS Inside_Sales,
+            ppt.po_type
         FROM sales_v_po sls
         LEFT JOIN Sales_V_PO_Status svps
             ON TRY_CAST(sls.PO_Status_Key AS INTEGER) = svps.PO_Status_Key
+        left join Plexus_control_v_plexus_user ppu on sls.inside_sales = ppu.Plexus_user_no
+        left join plex_po_type ppt on sls.po_type_key = ppt.po_type_key
     """)
-    dim_po.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_po2")
+    dim_po.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_po1")
 
 
     # 4. dim_part
@@ -65,4 +69,19 @@ def run(spark):
             CONCAT(Part_No, '-', Revision) AS Item_No
         FROM part_v_part
     """)
-    dim_part.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_part3")
+    dim_part.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_part1")
+
+    #dim_release
+    dim_release = spark.sql("""
+        SELECT 
+            release_key,
+            ship_date,
+            due_date,
+            po_line_key,
+           CAST(Quantity AS DOUBLE) AS Quantity_Ordered,
+            CAST(Quantity_Shipped AS DOUBLE) AS Quantity_Shipped 
+        FROM sales_v_release
+    """)
+    dim_release.write.format("iceberg").mode("overwrite").saveAsTable(f"{TARGET_NAMESPACE}.dim_release")
+
+    

@@ -17,10 +17,11 @@ def run(spark):
     print(f"DEBUG: fact.py using TARGET_NAMESPACE: {TARGET_NAMESPACE}")
 
 
-    dim_part = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_part3")
-    dim_customer = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_customer11")
-    dim_po = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_po2")
+    dim_part = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_part1")
+    dim_customer = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_customer1")
+    dim_po = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_po1")
     dim_shipper = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_shipper1")
+    dim_release = spark.read.format("iceberg").load(f"{TARGET_NAMESPACE}.dim_release")
 
     # 2. Source Data (Staging/Transactional)
 
@@ -36,59 +37,66 @@ def run(spark):
             dp_part.part_key,
             dc.customer_key AS customer_address_no,
             ds.shipper_key,
-            rel.release_key,
+            dr.release_key,
 
-            -- MEASURES from Source
-            CAST(rel.Quantity AS DOUBLE) AS Quantity_Ordered,
-            CAST(rel.Quantity_Shipped AS DOUBLE) AS Quantity_Shipped,
-            (CAST(rel.Quantity AS DOUBLE) - CAST(rel.Quantity_Shipped AS DOUBLE)) AS Quantity_Remaining,
-            ds.freight_amount AS Freight_Amount, -- Sourced from Dim Shipper as requested previously
+            -- MEASURES fetched from Dimension
+            dr.Quantity_Ordered,
+            dr.Quantity_Shipped,
+            (dr.Quantity_Ordered - dr.Quantity_Shipped) AS Quantity_Remaining,
+            svp.Price,
+            dr.Quantity_Ordered * svp.price AS amount,
+            --ds.freight_amount AS Freight_Amount, -- Sourced from Dim Shipper as requested previously
 
             -- DATES & ATTRIBUTES
-            rel.Ship_Date,
-            rel.Due_Date,
-            sls.Note,
-            dp_po.PO_Status -- Denormalized from Dim PO
-            
+            dr.ship_date,
+            dr.due_date as customer_due_date,
+            p.period_display as Period,
+            CONCAT('Q', CAST(p.quarter_group AS STRING)) AS Quarter
+ 
         FROM Sales_V_PO_Line sal
 
-        -- JOIN SOURCE TABLES TO BUILD "STAGING" RECORD
-        -- (This reconstructs the transaction event)
-        JOIN Sales_V_Release rel
-            ON sal.PO_Line_Key = TRY_CAST(rel.po_line_key AS INTEGER)
+        -- JOIN DIMENSION TABLE INSTEAD OF SOURCE
+        JOIN {TARGET_NAMESPACE}.dim_release dr
+            ON sal.PO_Line_Key = TRY_CAST(dr.po_line_key AS INTEGER)
 
         LEFT JOIN Sales_V_PO sls
             ON sal.PO_Key = TRY_CAST(sls.PO_Key AS INTEGER)
 
         -- JOIN DIMENSIONS TO GET SURROGATE KEYS
         -- The Fact Table MUST link to the Dimension ID.
+
+        LEFT JOIN Sales_V_Price svp 
+        ON svp.po_line_key = sal.PO_Line_Key
+        
+        LEFT JOIN PlexPeriod p             
+        ON dr.ship_date >= p.Begin_Date
+       AND dr.ship_date < p.End_Date
+
         
         -- 1. Dim Part
         -- Join Condition: Source.Part_Key = Dim.part_key (Natural Key Match)
-        LEFT JOIN {TARGET_NAMESPACE}.dim_part dp_part
+        LEFT JOIN {TARGET_NAMESPACE}.dim_part1 dp_part
             ON TRY_CAST(sal.Part_Key AS INTEGER) = dp_part.part_key
 
         -- 2. Dim PO
-        LEFT JOIN {TARGET_NAMESPACE}.dim_po dp_po
+        LEFT JOIN {TARGET_NAMESPACE}.dim_po1 dp_po
             ON TRY_CAST(sal.PO_Key AS INTEGER) = dp_po.po_key
 
         -- 3. Dim Customer
-        LEFT JOIN {TARGET_NAMESPACE}.dim_customer dc
+        LEFT JOIN {TARGET_NAMESPACE}.dim_customer1 dc
             ON sls.Customer_Address_No = dc.customer_key
             
         -- 4. Dim Shipper
         -- (Complex Join Logic as defined by user: Linked via Release Key)
-        LEFT JOIN {TARGET_NAMESPACE}.dim_shipper ds
-            ON TRY_CAST(rel.Release_Key AS INTEGER) = ds.release_key
-
-        WHERE rel.Ship_Date > '2025-06-29'
+        LEFT JOIN {TARGET_NAMESPACE}.dim_shipper1 ds
+            ON TRY_CAST(dr.release_key AS INTEGER) = ds.release_key
         
-        ORDER BY rel.Ship_Date
+        ORDER BY dr.ship_date
     """)
 
 
     fact_sales.write.format("iceberg") \
         .mode("overwrite") \
-        .saveAsTable(f"{TARGET_NAMESPACE}.fact_sales_release1")
+        .saveAsTable(f"{TARGET_NAMESPACE}.fact_sales_release12")
 
 
